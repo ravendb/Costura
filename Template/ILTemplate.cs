@@ -9,6 +9,9 @@ static class ILTemplate
     static readonly Dictionary<string, string> assemblyNames = new Dictionary<string, string>();
     static readonly Dictionary<string, string> symbolNames = new Dictionary<string, string>();
 
+    [ThreadStatic]
+    static Dictionary<string, object> currentlyLoading; 
+
     public static void Attach()
     {
         var currentDomain = AppDomain.CurrentDomain;
@@ -17,32 +20,46 @@ static class ILTemplate
 
     public static Assembly ResolveAssembly(string assemblyName)
     {
-        if (nullCache.ContainsKey(assemblyName))
+        if (currentlyLoading == null)
+            currentlyLoading = new Dictionary<string, object>();
+        try
         {
-            return null;
-        }
+            if (currentlyLoading.ContainsKey(assemblyName))
+                return null;
+            
+            currentlyLoading.Add(assemblyName, null);
 
-        var requestedAssemblyName = new AssemblyName(assemblyName);
+            if (nullCache.ContainsKey(assemblyName))
+            {
+                return null;
+            }
 
-        var assembly = Common.ReadExistingAssembly(requestedAssemblyName);
-        if (assembly != null)
-        {
+            var requestedAssemblyName = new AssemblyName(assemblyName);
+
+            var assembly = Common.ReadExistingAssembly(requestedAssemblyName);
+            if (assembly != null)
+            {
+                return assembly;
+            }
+
+            Common.Log("Loading assembly '{0}' into the AppDomain", requestedAssemblyName);
+
+            assembly = Common.ReadFromEmbeddedResources(assemblyNames, symbolNames, requestedAssemblyName);
+            if (assembly == null)
+            {
+                nullCache.Add(assemblyName, true);
+
+                // Handles retargeted assemblies like PCL
+                if (requestedAssemblyName.Flags == AssemblyNameFlags.Retargetable)
+                {
+                    assembly = Assembly.Load(requestedAssemblyName);
+                }
+            }
             return assembly;
         }
-
-        Common.Log("Loading assembly '{0}' into the AppDomain", requestedAssemblyName);
-
-        assembly = Common.ReadFromEmbeddedResources(assemblyNames, symbolNames, requestedAssemblyName);
-        if (assembly == null)
+        finally
         {
-            nullCache.Add(assemblyName, true);
-
-            // Handles retargeted assemblies like PCL
-            if (requestedAssemblyName.Flags == AssemblyNameFlags.Retargetable)
-            {
-                assembly = Assembly.Load(requestedAssemblyName);
-            }
+            currentlyLoading.Remove(assemblyName);
         }
-        return assembly;
     }
 }
