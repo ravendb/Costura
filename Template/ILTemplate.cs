@@ -7,6 +7,7 @@ static class ILTemplate
 	static readonly Dictionary<string, bool> nullCache = new Dictionary<string, bool>();
 
 	static readonly Dictionary<string, string> assemblyNames = new Dictionary<string, string>();
+
 	static readonly Dictionary<string, string> symbolNames = new Dictionary<string, string>();
 
 	[ThreadStatic]
@@ -25,22 +26,40 @@ static class ILTemplate
 		if (currentlyLoading == null)
 			currentlyLoading = new Dictionary<string, object>();
 
-		if (nullCache.ContainsKey(assemblyName))
-			return null;
+		var requestedAssemblyName = new AssemblyName(assemblyName);
+		string assemblyKey;
 
 		try
 		{
-			if (currentlyLoading.ContainsKey(assemblyName))
-				return null;
+			assemblyKey = requestedAssemblyName.Name + ";" + requestedAssemblyName.Version + ";";
+		}
+		catch (Exception)
+		{
+			assemblyKey = assemblyName;
+		}
 
-			currentlyLoading.Add(assemblyName, null);
+		assemblyKey = assemblyKey.ToLower();
+
+		if (nullCache.ContainsKey(assemblyKey))
+			return null;
+
+		var added = false;
+
+		try
+		{
+			if (currentlyLoading.ContainsKey(assemblyKey))
+				return null;
 
 			lock (Locker)
 			{
-				if (nullCache.ContainsKey(assemblyName))
+				if (currentlyLoading.ContainsKey(assemblyKey))
 					return null;
 
-				var requestedAssemblyName = new AssemblyName(assemblyName);
+				currentlyLoading.Add(assemblyKey, null);
+				added = true;
+
+				if (nullCache.ContainsKey(assemblyKey))
+					return null;
 
 				var assembly = Common.ReadExistingAssembly(requestedAssemblyName);
 				if (assembly != null)
@@ -53,7 +72,7 @@ static class ILTemplate
 				assembly = Common.ReadFromEmbeddedResources(assemblyNames, symbolNames, requestedAssemblyName);
 				if (assembly == null)
 				{
-					nullCache.Add(assemblyName, true);
+					nullCache.Add(assemblyKey, true);
 
 					// Handles retargeted assemblies like PCL
 					if (requestedAssemblyName.Flags == AssemblyNameFlags.Retargetable)
@@ -66,7 +85,8 @@ static class ILTemplate
 		}
 		finally
 		{
-			currentlyLoading.Remove(assemblyName);
+			if (added)
+				currentlyLoading.Remove(assemblyKey);
 		}
 	}
 }
