@@ -1,8 +1,10 @@
-﻿using System.Linq;
+﻿using System.Collections.Generic;
+using System.Linq;
 using Mono.Cecil;
 
 partial class ModuleWeaver
 {
+    List<TypeDefinition> msCoreTypes;
     TypeReference voidTypeReference;
     MethodReference compilerGeneratedAttributeCtor;
     MethodReference dictionaryOfStringOfStringAdd;
@@ -11,7 +13,8 @@ partial class ModuleWeaver
     void FindMsCoreReferences()
     {
         var msCoreLibDefinition = AssemblyResolver.Resolve("mscorlib");
-        var msCoreTypes = msCoreLibDefinition.MainModule.Types;
+
+        msCoreTypes = msCoreLibDefinition.MainModule.Types.ToList();
 
         var objectDefinition = msCoreTypes.FirstOrDefault(x => x.Name == "Object");
         if (objectDefinition == null)
@@ -20,19 +23,19 @@ partial class ModuleWeaver
         }
 
         var voidDefinition = msCoreTypes.First(x => x.Name == "Void");
-        voidTypeReference = ModuleDefinition.Import(voidDefinition);
+        voidTypeReference = ModuleDefinition.ImportReference(voidDefinition);
 
         var dictionary = msCoreTypes.First(x => x.Name == "Dictionary`2");
-        var dictionaryOfStringOfString = ModuleDefinition.Import(dictionary);
-        dictionaryOfStringOfStringAdd = ModuleDefinition.Import(dictionaryOfStringOfString.Resolve().Methods.First(m => m.Name == "Add"))
+        var dictionaryOfStringOfString = ModuleDefinition.ImportReference(dictionary);
+        dictionaryOfStringOfStringAdd = ModuleDefinition.ImportReference(dictionaryOfStringOfString.Resolve().Methods.First(m => m.Name == "Add"))
             .MakeHostInstanceGeneric(ModuleDefinition.TypeSystem.String, ModuleDefinition.TypeSystem.String);
 
         var list = msCoreTypes.First(x => x.Name == "List`1");
-        var listOfString = ModuleDefinition.Import(list);
-        listOfStringAdd = ModuleDefinition.Import(listOfString.Resolve().Methods.First(m => m.Name == "Add"))
+        var listOfString = ModuleDefinition.ImportReference(list);
+        listOfStringAdd = ModuleDefinition.ImportReference(listOfString.Resolve().Methods.First(m => m.Name == "Add"))
             .MakeHostInstanceGeneric(ModuleDefinition.TypeSystem.String);
 
         var compilerGeneratedAttribute = msCoreTypes.First(x => x.Name == "CompilerGeneratedAttribute");
-        compilerGeneratedAttributeCtor = ModuleDefinition.Import(compilerGeneratedAttribute.Methods.First(x => x.IsConstructor));
+        compilerGeneratedAttributeCtor = ModuleDefinition.ImportReference(compilerGeneratedAttribute.Methods.First(x => x.IsConstructor));
     }
 }

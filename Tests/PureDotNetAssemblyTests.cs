@@ -5,7 +5,6 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Xml.Linq;
-using ApprovalTests;
 using ApprovalTests.Reporters;
 using Mono.Cecil;
 using NUnit.Framework;
@@ -18,7 +17,6 @@ public class PureDotNetAssemblyTests
     string beforeAssemblyPath;
     string afterAssemblyPath;
     ModuleDefinition moduleDefinition;
-    string isolatedPath;
 
     public PureDotNetAssemblyTests()
     {
@@ -33,7 +31,7 @@ public class PureDotNetAssemblyTests
         File.Copy(beforeAssemblyPath, afterAssemblyPath, true);
         File.Copy(beforeAssemblyPath.Replace(".dll", ".pdb"), afterAssemblyPath.Replace(".dll", ".pdb"), true);
 
-        var readerParams = new ReaderParameters() { ReadSymbols = true };
+        var readerParams = new ReaderParameters { ReadSymbols = true };
 
         moduleDefinition = ModuleDefinition.ReadModule(afterAssemblyPath, readerParams);
 
@@ -57,11 +55,11 @@ public class PureDotNetAssemblyTests
             })
         {
             weavingTask.Execute();
-            var writerParams = new WriterParameters() { WriteSymbols = true };
+            var writerParams = new WriterParameters { WriteSymbols = true };
             moduleDefinition.Write(afterAssemblyPath, writerParams);
         }
 
-        isolatedPath = Path.Combine(Path.GetTempPath(), "CosturaPureDotNetIsolatedMemory.dll");
+        var isolatedPath = Path.Combine(Path.GetTempPath(), "CosturaPureDotNetIsolatedMemory.dll");
         File.Copy(afterAssemblyPath, isolatedPath, true);
         File.Copy(afterAssemblyPath.Replace(".dll", ".pdb"), isolatedPath.Replace(".dll", ".pdb"), true);
         assembly = Assembly.LoadFile(isolatedPath);
@@ -93,6 +91,12 @@ public class PureDotNetAssemblyTests
     public void EnsureOnly1RefToMscorLib()
     {
         Assert.AreEqual(1, moduleDefinition.AssemblyReferences.Count(x => x.Name == "mscorlib"));
+    }
+
+    [Test]
+    public void EnsureNoReferenceToTemplate()
+    {
+        Assert.AreEqual(0, moduleDefinition.AssemblyReferences.Count(x => x.Name == "Template"));
     }
 
     [Test]
