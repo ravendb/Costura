@@ -80,7 +80,16 @@ static class Common
         var assemblies = currentDomain.GetAssemblies();
         foreach (var assembly in assemblies)
         {
-            var currentName = assembly.GetName();
+            AssemblyName currentName;
+            try
+            {
+                currentName = new AssemblyName(assembly.FullName);
+            }
+            catch (Exception)
+            {
+                currentName = assembly.GetName();
+            }
+            
             if (string.Equals(currentName.Name, name.Name, StringComparison.InvariantCultureIgnoreCase) &&
                 string.Equals(CultureToString(currentName.CultureInfo), CultureToString(name.CultureInfo), StringComparison.InvariantCultureIgnoreCase))
             {
